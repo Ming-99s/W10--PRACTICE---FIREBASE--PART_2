@@ -11,9 +11,11 @@ class ArtistRepositoryFirebase implements ArtistRepository {
     'test-project-1716e-default-rtdb.asia-southeast1.firebasedatabase.app',
     '/artists.json',
   );
+  List<Artist>? _cachedArtists;
 
   @override
   Future<List<Artist>> fetchArtists() async {
+    if (_cachedArtists != null) return _cachedArtists!;
     final http.Response response = await http.get(artistsUri);
 
     if (response.statusCode == 200) {
@@ -24,6 +26,7 @@ class ArtistRepositoryFirebase implements ArtistRepository {
       for (final entry in songJson.entries) {
         result.add(ArtistDto.fromJson(entry.key, entry.value));
       }
+      _cachedArtists = result;
       return result;
     } else {
       // 2- Throw expcetion if any issue

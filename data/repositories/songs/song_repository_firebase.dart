@@ -6,49 +6,65 @@ import '../../../model/songs/song.dart';
 import '../../dtos/song_dto.dart';
 import 'song_repository.dart';
 
+
 class SongRepositoryFirebase extends SongRepository {
+  final String baseUrl =
+      'test-project-1716e-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  List<Song>? _cachedSongs;
+
   @override
   Future<List<Song>> fetchSongs() async {
-    final Uri songsUri = Uri.https(
-      'test-project-1716e-default-rtdb.asia-southeast1.firebasedatabase.app',
-      '/songs.json',
-    );
-    final http.Response response = await http.get(songsUri);
+    
+    if (_cachedSongs != null) return _cachedSongs!;
+
+    final Uri songsUri = Uri.https(baseUrl, '/songs.json');
+    final response = await http.get(songsUri);
 
     if (response.statusCode == 200) {
-      // 1 - Send the retrieved list of songs
       Map<String, dynamic> songJson = json.decode(response.body);
 
       List<Song> result = [];
       for (final entry in songJson.entries) {
         result.add(SongDto.fromJson(entry.key, entry.value));
       }
+
+      _cachedSongs = result; 
       return result;
     } else {
-      // 2- Throw expcetion if any issue
-      throw Exception('Failed to load posts');
+      throw Exception('Failed to load songs');
     }
   }
 
   @override
-  Future<Song?> fetchSongById(String id) async {}
+  Future<Song?> fetchSongById(String id) async {
+    final songs = await fetchSongs();
+
+    try {
+      return songs.firstWhere((s) => s.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
 
   @override
   Future<void> increaseLike(String id) async {
-    final Uri songUri = Uri.https(
-      'test-project-1716e-default-rtdb.asia-southeast1.firebasedatabase.app',
-      '/songs/$id.json',
-    );
-    final http.Response response = await http.put(
+    final song = await fetchSongById(id);
+    if (song == null) throw Exception("Song not found");
+
+    final int newLikes = song.likes + 1;
+
+    final Uri songUri = Uri.https(baseUrl, '/songs/$id.json');
+
+    final response = await http.patch(
       songUri,
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        '.sv': {'increment': 1},
-      }),
+      body: json.encode({'like': newLikes}),
     );
 
-    if (response.statusCode != 200) { 
-      throw Exception('Failed to increase like for song $id');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to increase like');
     }
+
   }
 }
